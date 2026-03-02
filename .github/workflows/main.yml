@@ -22,6 +22,32 @@ jobs:
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
 
+        - name: Fix Info.plist CFBundleIcons
+        run: |
+          python3 -c '
+          import plistlib, os
+          for root, dirs, files in os.walk("."):
+              for file in files:
+                  if file.startswith("Info") and file.endswith(".plist"):
+                      path = os.path.join(root, file)
+                      try:
+                          with open(path, "rb") as f:
+                              p = plistlib.load(f)
+                          if isinstance(p, dict):
+                              modified = False
+                              if "CFBundleIcons" not in p:
+                                  p["CFBundleIcons"] = {"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon"]}}
+                                  modified = True
+                              if "CFBundleAlternateIcons" not in p["CFBundleIcons"]:
+                                  p["CFBundleIcons"]["CFBundleAlternateIcons"] = {}
+                                  modified = True
+                              if modified:
+                                  with open(path, "wb") as f:
+                                      plistlib.dump(p, f, fmt=plistlib.FMT_XML)
+                      except Exception as e:
+                          pass
+          '
+      
       - name: Generate Project Files
         run: python3 build-system/Make/Make.py generateProject --configurationPath build-system/appstore-configuration.json --disableProvisioningProfiles --disableExtensions --xcodeManagedCodesigning
 

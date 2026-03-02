@@ -17,7 +17,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: Generate Project Files
-        run: python3 build-system/Make/Make.py generateProject --configurationPath build-system/appstore-configuration.json --disableProvisioningProfiles --disableExtensions
+        run: python3 build-system/Make/Make.py generateProject --configurationPath build-system/appstore-configuration.json --disableProvisioningProfiles --disableExtensions --xcodeManagedCodesigning
 
       - name: Build Telegram (Unsigned)
         run: |

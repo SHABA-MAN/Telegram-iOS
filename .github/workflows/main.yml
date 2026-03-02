@@ -1,0 +1,38 @@
+name: Build Telegram IPA
+
+on:
+  workflow_dispatch: # هذا السطر يضيف زر لتشغيل البناء يدوياً متى شئت
+
+jobs:
+  build:
+    runs-on: macos-latest # استخدام أحدث جهاز ماك سحابي
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # خطوة حتمية لتحميل كل أجزاء تليجرام
+
+      - name: Setup Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Generate Project Files
+        run: make # تليجرام يستخدم هذا الأمر لتجهيز ملفات البناء
+
+      - name: Build Telegram (Unsigned)
+        run: |
+          # بناء التطبيق مخصصاً للآيفون وبدون طلب توقيع آبل
+          xcodebuild -workspace Telegram.xcworkspace -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
+
+      - name: Package to IPA
+        run: |
+          # تحويل التطبيق الخام إلى صيغة IPA ليقبله الآيفون
+          mkdir -p Payload
+          mv build/Telegram.app Payload/
+          zip -r Telegram-NoSearch.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telegram-Modified-IPA
+          path: Telegram-NoSearch.ipa

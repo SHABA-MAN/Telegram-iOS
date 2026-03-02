@@ -1,69 +1,61 @@
 name: Build Telegram IPA
 
 on:
-  workflow_dispatch: # هذا السطر يضيف زر لتشغيل البناء يدوياً متى شئت
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest # استخدام أحدث جهاز ماك سحابي
+    runs-on: macos-15 # استخدام نسخة مستقرة ومدعومة
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # خطوة حتمية لتحميل كل أجزاء تليجرام
+          submodules: recursive
 
       - name: Setup Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
 
-      - name: Remove Unsupported Icons
+      - name: Clean and Fix Icons
         run: |
+          # حذف الأيقونات المزعجة وتجاهل الأخطاء
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
-
-        - name: Fix Info.plist CFBundleIcons
+          
+      - name: Inject CFBundleIcons into Plists
         run: |
           python3 -c '
           import plistlib, os
           for root, dirs, files in os.walk("."):
               for file in files:
-                  if file.startswith("Info") and file.endswith(".plist"):
+                  if file.endswith(".plist"):
                       path = os.path.join(root, file)
                       try:
                           with open(path, "rb") as f:
                               p = plistlib.load(f)
                           if isinstance(p, dict):
-                              modified = False
-                              if "CFBundleIcons" not in p:
-                                  p["CFBundleIcons"] = {"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon"]}}
-                                  modified = True
-                              if "CFBundleAlternateIcons" not in p["CFBundleIcons"]:
-                                  p["CFBundleIcons"]["CFBundleAlternateIcons"] = {}
-                                  modified = True
-                              if modified:
-                                  with open(path, "wb") as f:
-                                      plistlib.dump(p, f, fmt=plistlib.FMT_XML)
-                      except Exception as e:
-                          pass
+                              p["CFBundleIcons"] = {"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon"]}}
+                              with open(path, "wb") as f:
+                                  plistlib.dump(p, f, fmt=plistlib.FMT_XML)
+                      except: pass
           '
-      
+
       - name: Generate Project Files
         run: python3 build-system/Make/Make.py generateProject --configurationPath build-system/appstore-configuration.json --disableProvisioningProfiles --disableExtensions --xcodeManagedCodesigning
 
-      - name: Build Telegram (Unsigned)
+      - name: Build Telegram
         run: |
           xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
 
       - name: Package to IPA
         run: |
-          # تحويل التطبيق الخام إلى صيغة IPA ليقبله الآيفون
           mkdir -p Payload
-          mv build/Telegram.app Payload/
+          cp -R build/Telegram.app Payload/
           zip -r Telegram-NoSearch.ipa Payload
 
-      - name: Upload IPA Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Telegram-Modified-IPA
+          name: Telegram-Custom
           path: Telegram-NoSearch.ipa

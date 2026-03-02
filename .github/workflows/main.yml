@@ -27,8 +27,7 @@ jobs:
 
       - name: Build Telegram (Unsigned)
         run: |
-          # بناء التطبيق مخصصاً للآيفون وبدون طلب توقيع آبل
-          xcodebuild -workspace Telegram.xcworkspace -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
+          xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
 
       - name: Package to IPA
         run: |

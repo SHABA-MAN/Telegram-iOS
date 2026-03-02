@@ -4620,6 +4620,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
         
     private var previousSearchToggleTimestamp: Double?
     func activateSearch(filter: ChatListSearchFilter = .chats, query: String? = nil, skipScrolling: Bool = false, searchContentNode: NavigationBarSearchContentNode?) {
+        return
         Task { @MainActor [weak self] in
             guard let self else {
                 return
@@ -4663,7 +4664,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                         
                         if let searchBarNode = self.currentTabBarSearchNode?() as? SearchBarNode {
                             self.chatListDisplayNode.searchDisplayController?.setSearchBar(searchBarNode)
-                            searchBarNode.activate()
+                            //searchBarNode.activate()
                         }
                     } else {
                         (self.parent as? TabBarController)?.updateIsTabBarHidden(true, transition: transition)

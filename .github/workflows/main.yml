@@ -18,9 +18,9 @@ jobs:
 
       - name: Remove Unsupported Icons
         run: |
-          # البحث عن كل الأيقونات بصيغة .icon وحذفها لكي لا يطلب Xcode 26
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
+          echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
 
       - name: Generate Project Files
         run: python3 build-system/Make/Make.py generateProject --configurationPath build-system/appstore-configuration.json --disableProvisioningProfiles --disableExtensions --xcodeManagedCodesigning

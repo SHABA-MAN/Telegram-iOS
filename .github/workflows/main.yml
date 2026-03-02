@@ -17,7 +17,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: Generate Project Files
-        run: make # تليجرام يستخدم هذا الأمر لتجهيز ملفات البناء
+        run: python3 build-system/Make/Make.py generateProject 
 
       - name: Build Telegram (Unsigned)
         run: |

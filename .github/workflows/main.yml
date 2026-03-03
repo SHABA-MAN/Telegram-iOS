@@ -16,15 +16,22 @@ jobs:
       - name: Setup Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
-      - name: Hard Patch Source Code (Fix iOS 26 Errors)
+      - name: Ultimate Project Patching
         run: |
+          # 1. تنظيف الأيقونات
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
           
+          # 2. تصليح أكواد السويفت (iOS 26)
           find . -name "*.swift" -exec sed -i '' '/func preferredWindowingControlStyle/,/}/d' {} +
           find . -name "*.swift" -exec sed -i '' 's/@available(iOS 26.0, \*)/@available(iOS 11.0, \*)/g' {} +
 
+          # 3. الضربة القاضية للشهادات: مسح أي ذكر لاسم شهادة تليجرام في أي ملف BUILD أو .bzl
+          find . \( -name "BUILD" -o -name "*.bzl" \) -exec sed -i '' 's/"iOS Team Provisioning Profile: ph.telegra.Telegraph"/""/g' {} +
+          find . \( -name "BUILD" -o -name "*.bzl" \) -exec sed -i '' 's/provisioning_profile = [^,]*)/provisioning_profile = None)/g' {} +
+
+          # 4. تفريغ ملف الإعدادات تماماً
           python3 -c '
           import json, os
           path = "build-system/appstore-configuration.json"
@@ -36,7 +43,7 @@ jobs:
               with open(path, "w") as f: json.dump(data, f, indent=4)
           '
 
-      - name: Inject CFBundleIcons into Plists
+      - name: Inject CFBundleIcons (Safe Mode)
         run: |
           python3 -c '
           import plistlib, os
@@ -47,32 +54,8 @@ jobs:
                       try:
                           with open(path, "rb") as f: p = plistlib.load(f)
                           if isinstance(p, dict):
-                              if "CFBundleIcons" not in p: p["CFBundleIcons"] = {}
-                              if "CFBundlePrimaryIcon" not in p["CFBundleIcons"]: p["CFBundleIcons"]["CFBundlePrimaryIcon"] = {"CFBundleIconFiles": ["AppIcon"], "UIPrerenderedIcon": False}
-                              if "CFBundleAlternateIcons" not in p["CFBundleIcons"]: p["CFBundleIcons"]["CFBundleAlternateIcons"] = {}
+                              p["CFBundleIcons"] = {"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon"], "UIPrerenderedIcon": False}, "CFBundleAlternateIcons": {}}
                               with open(path, "wb") as f: plistlib.dump(p, f, fmt=plistlib.FMT_XML)
-                      except: pass
-          '
-
-      - name: Monkey-Patch Telegram Python Scripts
-        run: |
-          # الخطوة العبقرية: تعديل سكريبتات تليجرام لعدم الانهيار عند اختفاء الأيقونات
-          python3 -c '
-          import os
-          for root, dirs, files in os.walk("."):
-              for f in files:
-                  if f.endswith(".py"):
-                      path = os.path.join(root, f)
-                      try:
-                          with open(path, "r") as file: content = file.read()
-                          if "CFBundleIcons" in content:
-                              # استبدال القراءة المباشرة بقراءة آمنة تصنع الملف لو غير موجود
-                              patch1 = ".setdefault(\"CFBundleIcons\", {\"CFBundlePrimaryIcon\": {\"CFBundleIconFiles\": [\"AppIcon\"], \"UIPrerenderedIcon\": False}, \"CFBundleAlternateIcons\": {}})"
-                              patch2 = ".setdefault(\"CFBundleIcons\", {\"CFBundlePrimaryIcon\": {\"CFBundleIconFiles\": [\"AppIcon\"], \"UIPrerenderedIcon\": False}, \"CFBundleAlternateIcons\": {}})"
-                              content = content.replace("[\"CFBundleIcons\"]", patch1)
-                              content = content.replace("[\"CFBundleIcons\"]", patch2)
-                              content = content.replace("[\"CFBundleIcons\"]", patch1)
-                              with open(path, "w") as file: file.write(content)
                       except: pass
           '
 
@@ -81,6 +64,7 @@ jobs:
 
       - name: Build Telegram
         run: |
+          # بناء التطبيق مع فرض عدم التوقيع في كل مرحلة
           xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ENTITLEMENTS_REQUIRED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
 
       - name: Package to IPA
@@ -92,5 +76,5 @@ jobs:
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Telegram-Custom-IPA
+          name: Telegram-Final-IPA
           path: Telegram-NoSearch.ipa

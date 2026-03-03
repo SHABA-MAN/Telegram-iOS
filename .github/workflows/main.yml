@@ -16,19 +16,34 @@ jobs:
       - name: Setup Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
-      - name: Smart Code Signing Bypass
+      - name: Clean Configuration (The Ultimate Fix)
         run: |
-          # 1. مسح الأيقونات لمنع طلب Xcode 26
+          # 1. مسح الأيقونات لتخطي خطأ إصدار Xcode
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
           
-          # 2. إجبار أداة البناء على بناء التطبيق خام بدون توقيع
-          echo "build --define=apple.skip_codesign=1" >> .bazelrc
-          echo "build --define=apple.ad_hoc_codesign=1" >> .bazelrc
-          
-          # 3. الضربة القناصة: تفريغ اسم الشهادة بدون مسح السطر لعدم كسر الكود
-          find . -name "BUILD" -exec sed -i '' 's/"iOS Team Provisioning Profile: ph.telegra.Telegraph"/""/g' {} +
+          # 2. الحل السحري: تفريغ الشهادات من ملف الإعدادات الأصلي باستخدام بايثون لضمان عدم كسر الكود
+          python3 -c '
+          import json
+          path = "build-system/appstore-configuration.json"
+          try:
+              with open(path, "r") as f:
+                  data = json.load(f)
+              
+              # مسح التيم آي دي والشهادات والتصاريح تماماً
+              data["teamId"] = ""
+              if "provisioningProfiles" in data:
+                  data["provisioningProfiles"] = {}
+              if "entitlements" in data:
+                  data["entitlements"] = {}
+                  
+              with open(path, "w") as f:
+                  json.dump(data, f, indent=4)
+              print("✅ تم تفريغ الشهادات من ملف الإعدادات بنجاح!")
+          except Exception as e:
+              print("Error:", e)
+          '
 
       - name: Inject CFBundleIcons into Plists
         run: |

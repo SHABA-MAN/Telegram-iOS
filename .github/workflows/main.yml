@@ -16,15 +16,20 @@ jobs:
       - name: Setup Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
-      - name: Clean and Hack Files
+      - name: Nuclear Code Signing Bypass
         run: |
-          # مسح الأيقونات غير المدعومة
+          # 1. مسح الأيقونات غير المدعومة
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
           
-          # إزالة الشهادة الرسمية المحفورة في كود تليجرام بخدعة برمجية
-          sed -i '' 's/"iOS Team Provisioning Profile: ph.telegra.Telegraph"/None/g' Telegram/BUILD
+          # 2. الضربة القاضية: مسح أي سطر بيطلب شهادات أو تصاريح من كل ملفات البناء في تليجرام
+          find . -name "BUILD" -exec sed -i '' '/provisioning_profile/d' {} +
+          find . -name "BUILD" -exec sed -i '' '/entitlements/d' {} +
+          
+          # 3. إجبار أداة البناء على بناء التطبيق خام بدون توقيع
+          echo "build --define=apple.skip_codesign=1" >> .bazelrc
+          echo "build --define=apple.ad_hoc_codesign=1" >> .bazelrc
 
       - name: Inject CFBundleIcons into Plists
         run: |
@@ -49,7 +54,8 @@ jobs:
 
       - name: Build Telegram
         run: |
-          xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ENTITLEMENTS_REQUIRED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
+          # إضافة كل أوامر التجاهل لبرنامج Xcode لضمان عدم توقف البناء
+          xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ENTITLEMENTS_REQUIRED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
 
       - name: Package to IPA
         run: |

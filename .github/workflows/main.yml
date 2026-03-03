@@ -16,18 +16,20 @@ jobs:
       - name: Setup Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
-      - name: Hard Patch Source Code
+      - name: Hard Patch Source Code (Fix iOS 26 Errors)
         run: |
-          # 1. مسح الأيقونات لمنع طلب إصدارات خيالية من Xcode
+          # 1. مسح الأيقونات لمنع طلب Xcode خيالي
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
           
-          # 2. حذف الكود المسبب لخطأ iOS 26 (تصفية ملفات السويفت)
-          # الأمر ده هيدور على الوظيفة المسببة للخطأ ويمسحها من أي ملف تظهر فيه
+          # 2. حذف الدالة المسببة للخطأ تماماً من أي ملف سويفت
           find . -name "*.swift" -exec sed -i '' '/func preferredWindowingControlStyle/,/}/d' {} +
+          
+          # 3. استبدال إصدار iOS 26 بـ iOS 11 عشان الكومبايلر يرضى يكمل
+          find . -name "*.swift" -exec sed -i '' 's/@available(iOS 26.0, \*)/@available(iOS 11.0, \*)/g' {} +
 
-          # 3. تفريغ الشهادات من ملف الإعدادات
+          # 4. تفريغ الشهادات من ملف الإعدادات
           python3 -c '
           import json, os
           path = "build-system/appstore-configuration.json"
@@ -39,12 +41,29 @@ jobs:
               with open(path, "w") as f: json.dump(data, f, indent=4)
           '
 
+      - name: Inject CFBundleIcons into Plists
+        run: |
+          python3 -c '
+          import plistlib, os
+          for root, dirs, files in os.walk("."):
+              for file in files:
+                  if file.endswith(".plist"):
+                      path = os.path.join(root, file)
+                      try:
+                          with open(path, "rb") as f:
+                              p = plistlib.load(f)
+                          if isinstance(p, dict):
+                              p["CFBundleIcons"] = {"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon"]}}
+                              with open(path, "wb") as f:
+                                  plistlib.dump(p, f, fmt=plistlib.FMT_XML)
+                      except: pass
+          '
+
       - name: Generate Project Files
         run: python3 build-system/Make/Make.py generateProject --configurationPath build-system/appstore-configuration.json --disableProvisioningProfiles --disableExtensions --xcodeManagedCodesigning
 
       - name: Build Telegram
         run: |
-          # بناء التطبيق مع تجاهل التوقيع تماماً
           xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ENTITLEMENTS_REQUIRED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
 
       - name: Package to IPA

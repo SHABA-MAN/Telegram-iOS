@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest # استخدام نسخة مستقرة ومدعومة
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Code
@@ -16,9 +16,14 @@ jobs:
       - name: Setup Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
+      - name: Bypass Apple Code Signing
+        run: |
+          # إجبار أداة البناء على تجاهل شهادات آبل تماماً وبناء التطبيق خام
+          echo "build --define=apple.skip_codesign=1" >> .bazelrc
+          echo "build --define=apple.ad_hoc_codesign=1" >> .bazelrc
+
       - name: Clean and Fix Icons
         run: |
-          # حذف الأيقونات المزعجة وتجاهل الأخطاء
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
@@ -46,7 +51,7 @@ jobs:
 
       - name: Build Telegram
         run: |
-          xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
+          xcodebuild -project Telegram/Telegram.xcodeproj -scheme Telegram -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ENTITLEMENTS_REQUIRED=NO CONFIGURATION_BUILD_DIR=${PWD}/build build
 
       - name: Package to IPA
         run: |

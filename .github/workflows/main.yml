@@ -36,7 +36,7 @@ jobs:
               with open(path, "w") as f: json.dump(data, f, indent=4)
           '
 
-      - name: Inject CFBundleIcons into Plists (The REAL Fix)
+      - name: Inject CFBundleIcons into Plists
         run: |
           python3 -c '
           import plistlib, os
@@ -45,19 +45,35 @@ jobs:
                   if file.endswith(".plist"):
                       path = os.path.join(root, file)
                       try:
-                          with open(path, "rb") as f:
-                              p = plistlib.load(f)
+                          with open(path, "rb") as f: p = plistlib.load(f)
                           if isinstance(p, dict):
-                              if "CFBundleIcons" not in p:
-                                  p["CFBundleIcons"] = {}
-                              if "CFBundlePrimaryIcon" not in p["CFBundleIcons"]:
-                                  p["CFBundleIcons"]["CFBundlePrimaryIcon"] = {"CFBundleIconFiles": ["AppIcon"]}
-                              if "CFBundleAlternateIcons" not in p["CFBundleIcons"]:
-                                  p["CFBundleIcons"]["CFBundleAlternateIcons"] = {}
-                              
-                              with open(path, "wb") as f:
-                                  plistlib.dump(p, f, fmt=plistlib.FMT_XML)
-                      except Exception as e: pass
+                              if "CFBundleIcons" not in p: p["CFBundleIcons"] = {}
+                              if "CFBundlePrimaryIcon" not in p["CFBundleIcons"]: p["CFBundleIcons"]["CFBundlePrimaryIcon"] = {"CFBundleIconFiles": ["AppIcon"], "UIPrerenderedIcon": False}
+                              if "CFBundleAlternateIcons" not in p["CFBundleIcons"]: p["CFBundleIcons"]["CFBundleAlternateIcons"] = {}
+                              with open(path, "wb") as f: plistlib.dump(p, f, fmt=plistlib.FMT_XML)
+                      except: pass
+          '
+
+      - name: Monkey-Patch Telegram Python Scripts
+        run: |
+          # الخطوة العبقرية: تعديل سكريبتات تليجرام لعدم الانهيار عند اختفاء الأيقونات
+          python3 -c '
+          import os
+          for root, dirs, files in os.walk("."):
+              for f in files:
+                  if f.endswith(".py"):
+                      path = os.path.join(root, f)
+                      try:
+                          with open(path, "r") as file: content = file.read()
+                          if "CFBundleIcons" in content:
+                              # استبدال القراءة المباشرة بقراءة آمنة تصنع الملف لو غير موجود
+                              patch1 = ".setdefault(\"CFBundleIcons\", {\"CFBundlePrimaryIcon\": {\"CFBundleIconFiles\": [\"AppIcon\"], \"UIPrerenderedIcon\": False}, \"CFBundleAlternateIcons\": {}})"
+                              patch2 = ".setdefault(\"CFBundleIcons\", {\"CFBundlePrimaryIcon\": {\"CFBundleIconFiles\": [\"AppIcon\"], \"UIPrerenderedIcon\": False}, \"CFBundleAlternateIcons\": {}})"
+                              content = content.replace("[\"CFBundleIcons\"]", patch1)
+                              content = content.replace("[\"CFBundleIcons\"]", patch2)
+                              content = content.replace("[\"CFBundleIcons\"]", patch1)
+                              with open(path, "w") as file: file.write(content)
+                      except: pass
           '
 
       - name: Generate Project Files

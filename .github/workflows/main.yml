@@ -18,18 +18,13 @@ jobs:
 
       - name: Hard Patch Source Code (Fix iOS 26 Errors)
         run: |
-          # 1. مسح الأيقونات لمنع طلب Xcode خيالي
           find . -name "*.icon" -type d -exec rm -rf {} +
           find . -name "*.icon" -type f -exec rm -f {} +
           echo "common --incompatible_disallow_empty_glob=false" >> .bazelrc
           
-          # 2. حذف الدالة المسببة للخطأ تماماً من أي ملف سويفت
           find . -name "*.swift" -exec sed -i '' '/func preferredWindowingControlStyle/,/}/d' {} +
-          
-          # 3. استبدال إصدار iOS 26 بـ iOS 11 عشان الكومبايلر يرضى يكمل
           find . -name "*.swift" -exec sed -i '' 's/@available(iOS 26.0, \*)/@available(iOS 11.0, \*)/g' {} +
 
-          # 4. تفريغ الشهادات من ملف الإعدادات
           python3 -c '
           import json, os
           path = "build-system/appstore-configuration.json"
@@ -41,7 +36,7 @@ jobs:
               with open(path, "w") as f: json.dump(data, f, indent=4)
           '
 
-      - name: Inject CFBundleIcons into Plists
+      - name: Inject CFBundleIcons into Plists (The REAL Fix)
         run: |
           python3 -c '
           import plistlib, os
@@ -53,10 +48,16 @@ jobs:
                           with open(path, "rb") as f:
                               p = plistlib.load(f)
                           if isinstance(p, dict):
-                              p["CFBundleIcons"] = {"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon"]}}
+                              if "CFBundleIcons" not in p:
+                                  p["CFBundleIcons"] = {}
+                              if "CFBundlePrimaryIcon" not in p["CFBundleIcons"]:
+                                  p["CFBundleIcons"]["CFBundlePrimaryIcon"] = {"CFBundleIconFiles": ["AppIcon"]}
+                              if "CFBundleAlternateIcons" not in p["CFBundleIcons"]:
+                                  p["CFBundleIcons"]["CFBundleAlternateIcons"] = {}
+                              
                               with open(path, "wb") as f:
                                   plistlib.dump(p, f, fmt=plistlib.FMT_XML)
-                      except: pass
+                      except Exception as e: pass
           '
 
       - name: Generate Project Files
